@@ -1,0 +1,68 @@
+
+### Python Script: Fix Linux Repository and Kernel Issues
+```python
+import os
+import subprocess
+
+def run_command(command, fail_silently=False):
+    try:
+        print(f"Running: {command}")
+        output = subprocess.run(command, shell=True, check=True, capture_output=True, text=True)
+        return output.stdout.strip()
+    except subprocess.CalledProcessError as e:
+        if not fail_silently:
+            print(f"Error occurred while running command: {command}")
+            print(e.stderr.strip())
+        return None
+
+def fix_duplicate_repos():
+    print("Fixing duplicate repository issues...")
+    duplicate_files = run_command("grep -l 'archive_uri-http_apt_pop-os_org' /etc/apt/sources.list.d/*.list", fail_silently=True)
+    if duplicate_files:
+        for file in duplicate_files.splitlines():
+            print(f"Removing duplicate repository file: {file}")
+            os.remove(file)
+    run_command("sudo apt update", fail_silently=True)
+
+def ensure_kernel_installed(kernel_version):
+    print(f"Ensuring kernel {kernel_version} is installed...")
+    installed_kernels = run_command("dpkg --list | grep linux-image", fail_silently=True)
+    if kernel_version not in (installed_kernels or ""):
+        print(f"Installing kernel {kernel_version}...")
+        run_command(f"sudo apt install linux-image-{kernel_version} linux-modules-{kernel_version} -y", fail_silently=True)
+
+def regenerate_initramfs(kernel_version):
+    print(f"Regenerating initramfs for kernel {kernel_version}...")
+    initramfs_path = f"/boot/initrd.img-{kernel_version}"
+    if not os.path.exists(initramfs_path):
+        run_command(f"sudo update-initramfs -c -k {kernel_version}", fail_silently=True)
+    else:
+        print(f"Initramfs already exists: {initramfs_path}")
+
+def update_grub():
+    print("Updating GRUB bootloader...")
+    run_command("sudo update-grub", fail_silently=True)
+
+def main():
+    kernel_version = "6.1.0-1024-oem"  # Define the target kernel version
+    
+    print("Starting the magical Linux fixer script...")
+    
+    # Step 1: Fix duplicate repositories
+    fix_duplicate_repos()
+    
+    # Step 2: Ensure the required kernel is installed
+    ensure_kernel_installed(kernel_version)
+    
+    # Step 3: Regenerate initramfs
+    regenerate_initramfs(kernel_version)
+    
+    # Step 4: Update GRUB
+    update_grub()
+    
+    print("All done! Please reboot your system if a new kernel was installed.")
+
+if __name__ == "__main__":
+    main()
+```
+
